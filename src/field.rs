@@ -185,6 +185,39 @@ impl FieldElement {
         }
     }
 
+    pub fn batch_invert_edwards(inputs: &mut [crate::edwards::EdwardsPoint]) {
+        // Montgomery’s Trick and Fast Implementation of Masked AES
+        // Genelle, Prouff and Quisquater
+        // Section 3.2
+
+        let n = inputs.len();
+        let mut scratch = vec![FieldElement::one(); n];
+
+        // Keep an accumulator of all of the previous products
+        let mut acc = FieldElement::one();
+
+        // Pass through the input vector, recording the previous
+        // products in the scratch space
+        for (input, scratch) in inputs.iter().zip(scratch.iter_mut()) {
+            *scratch = acc;
+            acc = &acc * &input.Z;
+        }
+
+	// acc is nonzero iff all inputs are nonzero
+        assert_eq!(acc.is_zero().unwrap_u8(), 0);
+
+        // Compute the inverse of all products
+        acc = acc.invert();
+
+        // Pass through the vector backwards to compute the inverses
+        // in place
+        for (input, scratch) in inputs.iter_mut().rev().zip(scratch.into_iter().rev()) {
+            let tmp = &acc * &input.Z;
+            input.Z = &acc * &scratch;
+            acc = tmp;
+        }
+    }
+
     /// Given a nonzero field element, compute its inverse.
     ///
     /// The inverse is computed as self^(p-2), since

@@ -526,6 +526,25 @@ impl EdwardsPoint {
         CompressedEdwardsY(s)
     }
 
+    /// Batch compress many `EdwardsPoint`'s to `CompressedEdwardsY` format.
+	pub fn batch_compress_edwards(mut points: &mut [Self]) -> Vec<CompressedEdwardsY> {
+		FieldElement::batch_invert_edwards(&mut points);
+
+		let mut vec: Vec<CompressedEdwardsY> = Vec::with_capacity(points.len());
+
+		for (i, p) in points.iter().enumerate() {
+			let x = &p.X * &p.Z;
+			let y = &p.Y * &p.Z;
+
+			let mut s: [u8; 32];
+			s = y.to_bytes();
+			s[31] ^= x.is_negative().unwrap_u8() << 7;
+			vec.push(CompressedEdwardsY(s));
+		}
+
+		vec
+	}
+
     /// Perform hashing to the group using the Elligator2 map
     ///
     /// See https://tools.ietf.org/html/draft-irtf-cfrg-hash-to-curve-10#section-6.7.1
